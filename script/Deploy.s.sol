@@ -26,7 +26,7 @@ contract Deploy is Script {
         console.log("VaultToken deployed at:", address(vaultToken));
 
         // 3. Deploy LockVault
-        LockVault lockVault = new LockVault(address(membershipNft), address(vaultToken), treasury);
+        LockVault lockVault = new LockVault(address(membershipNft), address(vaultToken), treasury, rewardRate);
         console.log("LockVault deployed at:", address(lockVault));
 
         // 4. Link MembershipNFT and VaultToken to LockVault
@@ -36,14 +36,20 @@ contract Deploy is Script {
         vaultToken.setVaultAddress(address(lockVault));
         console.log("Linked VaultToken to LockVault");
 
+        // 5. Deploy MockEthToken
+        MockEthToken mockEthToken = new MockEthToken();
+        console.log("MockEthToken deployed at:", address(mockEthToken));
+
         // 5. Deploy Mock Oracle Feed
         // Initial price of 2000 * 1e8 (Chainlink uses 8 decimals for USD feeds)
         MockOracleFeed ethFeed = new MockOracleFeed(2000 * 1e8, block.timestamp);
         console.log("Mock ETH Feed deployed at:", address(ethFeed));
 
-        // 6. Set initial reward rate
-        lockVault.setRewardRate(rewardRate);
-        console.log("Initial reward rate set to:", rewardRate);
+        // 6. Whitelist MockEthToken in LockVault with MockOracleFeed
+        lockVault.addToken(address(mockEthToken), address(ethFeed));
+        console.log("MockEthToken whitelisted in LockVault with MockOracleFeed");
+
+
 
         vm.stopBroadcast();
 
