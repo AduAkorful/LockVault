@@ -97,7 +97,6 @@ contract LockVault is ILockVault, Ownable2Step {
     address[] public whitelistedTokens;
 
     // Sets address of membership nft token, vault token and treasury to send forfeited tokens
-    constructor(address _membershipNft, address _vaultToken, address _treasury) Ownable(msg.sender) {
     constructor(
         address _membershipNft,
         address _vaultToken,

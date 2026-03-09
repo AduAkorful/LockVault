@@ -100,9 +100,6 @@ interface ILockVault {
     // verifies if token has been whitelisted before it can work
     function removeToken(address token) external;
 
-    // Function to set reward rate for calculating token rewards
-    function setRewardRate(uint256 newRate) external;
-
     // Takes in an address to set as treasury for receiving emergency withdrawal penalties
     function setTreasury(address newTreasury) external;
 
