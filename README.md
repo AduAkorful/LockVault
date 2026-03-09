@@ -99,10 +99,7 @@ forge script script/Deploy.s.sol:Deploy --rpc-url $RPC_URL --account mywallet --
 
 If you would rather interact with the deployed protocol directly without cloning the repository, you can access the verified contracts on the Sepolia testnet using the links below:
 
-* **LockVault (Main Entry Point):** [0x66772f89A1caCD12E835767C733bEf47fB6A7950](https://sepolia.etherscan.io/address/0x66772f89A1caCD12E835767C733bEf47fB6A7950)
-* **MembershipNFT:** [0x86c7EEC7d74fDAA3699DcEdF745e022415a68A6C](https://sepolia.etherscan.io/address/0x86c7EEC7d74fDAA3699DcEdF745e022415a68A6C)
-* **VaultToken (VTK):** [0x42c8A9b199A91754aC403A57E3C7E2160C4d6268](https://sepolia.etherscan.io/address/0x42c8A9b199A91754aC403A57E3C7E2160C4d6268)
-* **Mock ETH Feed:** [0x0ecDB6A741A75e961435F024fD518eA26B6ACd2B](https://sepolia.etherscan.io/address/0x0ecDB6A741A75e961435F024fD518eA26B6ACd2B)
+// To be updated after some updates.
 
 ### How to Interact via Etherscan
 

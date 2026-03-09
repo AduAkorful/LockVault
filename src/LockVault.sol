@@ -43,9 +43,36 @@ contract LockVault is ILockVault, Ownable2Step {
 
     // Amount of VaultToken minted per second per every staken token
     // Scaled by precision so 1e9 means 1e9/1e18 since we can't use floating point integers
-    uint256 public rewardRate;
+    uint256 public immutable rewardRate;
 
-    // All stakes ever created by a user, including claimed ones.
+    // constant variable for the 30 days lock tier multiplier
+    uint16 public constant THIRTY_DAYS_MULTIPLIER = 100;
+
+    // constant variable for the 90 days lock tier multiplier
+    uint16 public constant NINETY_DAYS_MULTIPLIER = 250;
+
+    // constant variable for the 180 days lock tier multiplier
+    uint16 public constant ONE_EIGHTY_DAYS_MULTIPLIER = 600;
+
+    // constant variable for 30 days lock tier
+    uint32 public constant THIRTY_DAYS_LOCK_TIER = 30 days;
+
+    // constant variable for 90 days lock tier
+    uint32 public constant NINETY_DAYS_LOCK_TIER = 90 days;
+
+    // constant variable for 180 days lock tier
+    uint32 public constant ONE_EIGHTY_DAYS_LOCK_TIER = 180 days;
+
+    // constant variable for bronze tier rewards boost
+    // rewards are a percentage so it is scaled during the calculation
+    uint8 public constant BRONZE_TIER = 10;
+
+    // constant variable for silver tier rewards
+    uint8 public constant SILVER_TIER = 25;
+
+    // constant variable for gold tier rewards
+    uint8 public constant GOLD_TIER = 50;
+    
     mapping(address => mapping(uint256 => Stake)) private _userStakes;
 
     // Total number of stakes created by a user
@@ -71,12 +98,20 @@ contract LockVault is ILockVault, Ownable2Step {
 
     // Sets address of membership nft token, vault token and treasury to send forfeited tokens
     constructor(address _membershipNft, address _vaultToken, address _treasury) Ownable(msg.sender) {
+    constructor(
+        address _membershipNft,
+        address _vaultToken,
+        address _treasury,
+        uint256 _rewardRate
+    ) Ownable(msg.sender) {
         if (_membershipNft == address(0) || _vaultToken == address(0)) revert ZeroAddress();
         if (_treasury == address(0)) revert InvalidTreasury();
+        if (_rewardRate == 0) revert ZeroAmount();
 
         MEMBERSHIP_NFT = IMembershipNFT(_membershipNft);
         VAULT_TOKEN = IVaultToken(_vaultToken);
         treasury = _treasury;
+        rewardRate = _rewardRate;
     }
 
     // Function to whitelist a token
@@ -104,12 +139,6 @@ contract LockVault is ILockVault, Ownable2Step {
         emit TokenDelisted(token, block.timestamp);
     }
 
-    // Function to set reward rate for calculating token rewards
-    function setRewardRate(uint256 newRate) external onlyOwner {
-        uint256 oldRate = rewardRate;
-        rewardRate = newRate;
-        emit RewardRateUpdated(oldRate, newRate);
-    }
 
     // Takes in an address to set as treasury for receiving emergency withdrawal penalties
     function setTreasury(address newTreasury) external onlyOwner {
@@ -125,6 +154,9 @@ contract LockVault is ILockVault, Ownable2Step {
         if (!isWhitelisted[token]) revert NotWhitelisted(token);
         if (activeStakeCount[msg.sender] >= MAX_ACTIVE_STAKES) revert MaxStakesReached();
 
+        // Transfer tokens first to prevent phantom stake if transfer fails
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+
         uint256 stakeIndex = userStakeCount[msg.sender];
         _userStakes[msg.sender][stakeIndex] =
             Stake({token: token, amount: amount, lockTier: tier, startTime: block.timestamp, claimed: false});
@@ -137,8 +169,6 @@ contract LockVault is ILockVault, Ownable2Step {
         _checkAndMintMembership(msg.sender);
 
         emit Staked(msg.sender, token, amount, tier, stakeIndex);
-
-        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
     }
 
     // Allows users to withdraw their staked tokens and claim generated rewards after lock duration expiration
@@ -248,22 +278,22 @@ contract LockVault is ILockVault, Ownable2Step {
     }
 
     function _lockDuration(LockTier tier) private pure returns (uint256) {
-        if (tier == LockTier.ThirtyDays) return 30 days;
-        if (tier == LockTier.NinetyDays) return 90 days;
-        return 180 days;
+        if (tier == LockTier.ThirtyDays) return THIRTY_DAYS_LOCK_TIER;
+        if (tier == LockTier.NinetyDays) return NINETY_DAYS_LOCK_TIER;
+        return ONE_EIGHTY_DAYS_LOCK_TIER;
     }
 
     function _tierMultiplier(LockTier tier) private pure returns (uint256) {
-        if (tier == LockTier.ThirtyDays) return 100;
-        if (tier == LockTier.NinetyDays) return 250;
-        return 600;
+        if (tier == LockTier.ThirtyDays) return THIRTY_DAYS_MULTIPLIER;
+        if (tier == LockTier.NinetyDays) return NINETY_DAYS_MULTIPLIER;
+        return ONE_EIGHTY_DAYS_MULTIPLIER;
     }
 
     function _membershipBonus(address user) private view returns (uint256) {
         try MEMBERSHIP_NFT.getTier(user) returns (IMembershipNFT.Tier tier) {
-            if (tier == IMembershipNFT.Tier.Bronze) return 10;
-            if (tier == IMembershipNFT.Tier.Silver) return 25;
-            return 50;
+            if (tier == IMembershipNFT.Tier.Bronze) return BRONZE_TIER;
+            if (tier == IMembershipNFT.Tier.Silver) return SILVER_TIER;
+            return GOLD_TIER;
         } catch {
             return 0;
         }
@@ -282,7 +312,7 @@ contract LockVault is ILockVault, Ownable2Step {
         uint256 baseReward = (s.amount * rewardRate * elapsed) / PRECISION;
         uint256 tieredReward = (baseReward * _tierMultiplier(s.lockTier)) / 100;
         uint256 bonusPct = _membershipBonus(user);
-        return (tieredReward * (100 + bonusPct)) / 100;
+        return baseReward + ((tieredReward * (100 + bonusPct)) / 100);
     }
 
     function _checkAndMintMembership(address user) internal {
