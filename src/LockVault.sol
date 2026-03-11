@@ -43,7 +43,7 @@ contract LockVault is ILockVault, Ownable2Step {
 
     // Amount of VaultToken minted per second per every staken token
     // Scaled by precision so 1e9 means 1e9/1e18 since we can't use floating point integers
-    uint256 public immutable rewardRate;
+    uint256 public immutable REWARD_RATE;
 
     // constant variable for the 30 days lock tier multiplier
     uint16 public constant THIRTY_DAYS_MULTIPLIER = 100;
@@ -72,7 +72,7 @@ contract LockVault is ILockVault, Ownable2Step {
 
     // constant variable for gold tier rewards
     uint8 public constant GOLD_TIER = 50;
-    
+
     mapping(address => mapping(uint256 => Stake)) private _userStakes;
 
     // Total number of stakes created by a user
@@ -93,16 +93,16 @@ contract LockVault is ILockVault, Ownable2Step {
     // Total amount of each token currently held by the vault.
     mapping(address => uint256) public totalStakedPerToken;
 
+    // Total amount of each token normalized to 18 decimals
+    mapping(address => uint256) public totalNormalizedStakePerToken;
+
     // Ordered list of currently whitelisted token addresses.
     address[] public whitelistedTokens;
 
     // Sets address of membership nft token, vault token and treasury to send forfeited tokens
-    constructor(
-        address _membershipNft,
-        address _vaultToken,
-        address _treasury,
-        uint256 _rewardRate
-    ) Ownable(msg.sender) {
+    constructor(address _membershipNft, address _vaultToken, address _treasury, uint256 _rewardRate)
+        Ownable(msg.sender)
+    {
         if (_membershipNft == address(0) || _vaultToken == address(0)) revert ZeroAddress();
         if (_treasury == address(0)) revert InvalidTreasury();
         if (_rewardRate == 0) revert ZeroAmount();
@@ -110,7 +110,7 @@ contract LockVault is ILockVault, Ownable2Step {
         MEMBERSHIP_NFT = IMembershipNFT(_membershipNft);
         VAULT_TOKEN = IVaultToken(_vaultToken);
         treasury = _treasury;
-        rewardRate = _rewardRate;
+        REWARD_RATE = _rewardRate;
     }
 
     // Function to whitelist a token
@@ -118,9 +118,6 @@ contract LockVault is ILockVault, Ownable2Step {
     function addToken(address token, address priceFeed) external onlyOwner {
         if (token == address(0) || priceFeed == address(0)) revert ZeroAddress();
         if (isWhitelisted[token]) revert TokenAlreadyWhitelisted(token);
-
-        uint8 decimals = IERC20Metadata(token).decimals();
-        if (decimals != 18) revert InvalidDecimals();
 
         isWhitelisted[token] = true;
         tokenPriceFeed[token] = priceFeed;
@@ -137,7 +134,6 @@ contract LockVault is ILockVault, Ownable2Step {
 
         emit TokenDelisted(token, block.timestamp);
     }
-
 
     // Takes in an address to set as treasury for receiving emergency withdrawal penalties
     function setTreasury(address newTreasury) external onlyOwner {
@@ -160,9 +156,13 @@ contract LockVault is ILockVault, Ownable2Step {
         _userStakes[msg.sender][stakeIndex] =
             Stake({token: token, amount: amount, lockTier: tier, startTime: block.timestamp, claimed: false});
 
+        uint8 decimals = IERC20Metadata(token).decimals();
+        uint256 normalizedAmount = _normalize(amount, decimals);
+
         userStakeCount[msg.sender]++;
         activeStakeCount[msg.sender] += 1;
         totalStakedPerToken[token] += amount;
+        totalNormalizedStakePerToken[token] += normalizedAmount;
 
         userTotalVolume[msg.sender] += amount;
         _checkAndMintMembership(msg.sender);
@@ -234,6 +234,13 @@ contract LockVault is ILockVault, Ownable2Step {
         }
     }
 
+    function _normalize(uint256 amount, uint8 decimals) internal pure returns (uint256) {
+        uint256 normalizedAmount;
+        if (decimals < 18) return normalizedAmount = amount * 10 ** (18 - decimals);
+        else if (decimals > 18) return normalizedAmount = amount / 10 ** (decimals - 18);
+        else return amount;
+    }
+
     // Returns the pending rewards for a specific stake of a given user
     function getPendingRewards(address user, uint256 stakeIndex) external view returns (uint256) {
         if (stakeIndex > userStakeCount[user]) {
@@ -245,6 +252,26 @@ contract LockVault is ILockVault, Ownable2Step {
         return _calculateRewards(s, user);
     }
 
+    //Called to upgrade user membership if they reach the required threshold
+    function upgradeMembershipTier(address user) external {
+        if (user == address(0)) revert ZeroAddress();
+        uint256 userVolume = userTotalVolume[user];
+        uint8 currentTier = uint8(MEMBERSHIP_NFT.getTier(user));
+        uint8 newTier;
+
+        if (currentTier == MEMBERSHIP_NFT.getBronzeTier() && userVolume >= SILVER_THRESHOLD) {
+            newTier = MEMBERSHIP_NFT.getSilverTier();
+        } else if (currentTier == MEMBERSHIP_NFT.getSilverTier() && userVolume >= GOLD_THRESHOLD) {
+            newTier = MEMBERSHIP_NFT.getGoldTier();
+        } else {
+            revert UpgradeNotPossible();
+        }
+
+        MEMBERSHIP_NFT.upgradeTier(user, IMembershipNFT.Tier(newTier));
+
+        emit MembershipUpgraded(user, newTier);
+    }
+
     // Returns the total USD value locked across the provided tokens using chainlink price feed
     function getTotalValueLocked(address[] calldata tokens) external view returns (uint256 totalUsd) {
         for (uint256 i = 0; i < tokens.length; i++) {
@@ -252,7 +279,7 @@ contract LockVault is ILockVault, Ownable2Step {
 
             if (!isWhitelisted[token]) revert NotWhitelisted(token);
 
-            uint256 staked = totalStakedPerToken[token];
+            uint256 staked = totalNormalizedStakePerToken[token];
             if (staked == 0) continue;
 
             IMockOracleFeed feed = IMockOracleFeed(tokenPriceFeed[token]);
@@ -308,7 +335,7 @@ contract LockVault is ILockVault, Ownable2Step {
         uint256 duration = _lockDuration(s.lockTier);
         if (elapsed > duration) elapsed = duration;
 
-        uint256 baseReward = (s.amount * rewardRate * elapsed) / PRECISION;
+        uint256 baseReward = (s.amount * REWARD_RATE * elapsed) / PRECISION;
         uint256 tieredReward = (baseReward * _tierMultiplier(s.lockTier)) / 100;
         uint256 bonusPct = _membershipBonus(user);
         return baseReward + ((tieredReward * (100 + bonusPct)) / 100);

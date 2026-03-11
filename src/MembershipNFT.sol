@@ -25,6 +25,23 @@ contract MembershipNFT is ERC721, IMembershipNFT, Ownable2Step {
         if (vault != address(0)) revert VaultAlreadySet();
         if (_vault == address(0)) revert ZeroAddress();
         vault = _vault;
+
+        emit VaultSet(_vault);
+    }
+
+    // getter function for the bronze tier
+    function getBronzeTier() external pure returns (uint8) {
+        return uint8(Tier.Bronze);
+    }
+
+    // getter function for silver tier
+    function getSilverTier() external pure returns (uint8) {
+        return uint8(Tier.Silver);
+    }
+
+    // getter function for gold tier
+    function getGoldTier() external pure returns (uint8) {
+        return uint8(Tier.Gold);
     }
 
     // Mints new membership nft to user based on their tier
@@ -36,7 +53,7 @@ contract MembershipNFT is ERC721, IMembershipNFT, Ownable2Step {
         uint256 tokenId = ++_nextTokenId;
 
         _memberInfo[to] = MemberInfo({tier: tier, tokenId: tokenId});
-        _mint(to, tokenId);
+        _safeMint(to, tokenId);
 
         emit MembershipMinted(to, tokenId, tier);
     }
@@ -58,5 +75,14 @@ contract MembershipNFT is ERC721, IMembershipNFT, Ownable2Step {
         address from = _ownerOf(tokenId);
         if (from != address(0)) revert SoulboundTransferForbidden();
         return super._update(to, tokenId, auth);
+    }
+
+    function upgradeTier(address user, Tier newTier) external {
+        if (user == address(0)) revert ZeroAddress();
+        if (_memberInfo[user].tokenId == 0) revert NoMembership();
+
+        _memberInfo[user].tier = newTier;
+
+        emit MembershipUpgraded(user, newTier);
     }
 }

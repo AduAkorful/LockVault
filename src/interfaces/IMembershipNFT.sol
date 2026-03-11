@@ -37,6 +37,11 @@ interface IMembershipNFT {
     // Emitted when a membership nft is minted to a user
     event MembershipMinted(address indexed to, uint256 indexed tokenId, Tier tier);
 
+    //Emitted when membership is upgraded
+    event MembershipUpgraded(address indexed user, Tier indexed newTier);
+
+    //Emitted when vault address is set
+    event VaultSet(address vault);
     // Mints new membership nft to user based on their tier
     function mint(address to, Tier tier) external;
 
@@ -48,4 +53,16 @@ interface IMembershipNFT {
 
     // Called to set LockVault address
     function setVault(address _vault) external;
+
+    // getter function for the bronze tier
+    function getBronzeTier() external view returns (uint8);
+
+    // getter function for silver tier
+    function getSilverTier() external view returns (uint8);
+
+    // getter function for gold tier
+    function getGoldTier() external view returns (uint8);
+
+    // function to upgrade membership tier of user
+    function upgradeTier(address user, Tier newTier) external;
 }

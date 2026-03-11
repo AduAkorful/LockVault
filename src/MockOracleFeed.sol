@@ -18,19 +18,19 @@ contract MockOracleFeed is IMockOracleFeed, Ownable2Step {
 
     // Sets price to begin with and the timestamp for that
     // Sets the owner address for the onlyOwner modifier
-    constructor(int256 initialPrice, uint256 initialUpdatedAt) Ownable(msg.sender) {
+    constructor(int256 initialPrice) Ownable(msg.sender) {
         _price = initialPrice;
-        _updatedAt = initialUpdatedAt;
+        _updatedAt = block.timestamp;
         _roundId = 1;
     }
 
     // Updates the mock price and the timestamp
-    function setPrice(int256 price, uint256 updatedAt) external onlyOwner {
+    function setPrice(int256 price) external onlyOwner {
         if (price <= 0) revert InvalidPrice();
         ++_roundId;
         _price = price;
-        _updatedAt = updatedAt;
-        emit PriceUpdated(price, updatedAt);
+        _updatedAt = block.timestamp;
+        emit PriceUpdated(price, _updatedAt);
     }
 
     // Returns the number of decimals used by this price feed

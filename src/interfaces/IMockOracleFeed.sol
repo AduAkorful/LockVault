@@ -7,8 +7,8 @@ interface IMockOracleFeed {
 
     error InvalidPrice();
 
-    // Updates the mock price and the timestamp
-    function setPrice(int256 price, uint256 updatedAt) external;
+    // Updates the mock price
+    function setPrice(int256 price) external;
 
     // Returns the number of decimals used by this price feed
     function decimals() external pure returns (uint8);

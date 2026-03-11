@@ -7,11 +7,12 @@ import {VaultToken} from "../src/VaultToken.sol";
 import {MembershipNFT} from "../src/MembershipNFT.sol";
 import {LockVault} from "../src/LockVault.sol";
 import {MockOracleFeed} from "../src/MockOracleFeed.sol";
+import {MockEthToken} from "../src/MockEthToken.sol";
 
 contract Deploy is Script {
     function run() external {
         // Direct configuration (updated as per your request)
-        address treasury = msg.sender; 
+        address treasury = msg.sender;
         uint256 rewardRate = 1e9;
 
         // Start broadcasting transactions using the account provided to forge script
@@ -42,14 +43,12 @@ contract Deploy is Script {
 
         // 5. Deploy Mock Oracle Feed
         // Initial price of 2000 * 1e8 (Chainlink uses 8 decimals for USD feeds)
-        MockOracleFeed ethFeed = new MockOracleFeed(2000 * 1e8, block.timestamp);
+        MockOracleFeed ethFeed = new MockOracleFeed(2000 * 1e8);
         console.log("Mock ETH Feed deployed at:", address(ethFeed));
 
         // 6. Whitelist MockEthToken in LockVault with MockOracleFeed
         lockVault.addToken(address(mockEthToken), address(ethFeed));
         console.log("MockEthToken whitelisted in LockVault with MockOracleFeed");
-
-
 
         vm.stopBroadcast();
 

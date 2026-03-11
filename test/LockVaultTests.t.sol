@@ -12,6 +12,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MockERC20 is ERC20 {
     constructor() ERC20("MockToken", "MCK") {}
+
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
     }
@@ -35,14 +36,13 @@ contract LockVaultTest is Test {
 
         membershipNft = new MembershipNFT();
         vaultToken = new VaultToken();
-        vault = new LockVault(address(membershipNft), address(vaultToken), treasury);
+        vault = new LockVault(address(membershipNft), address(vaultToken), treasury, REWARD_RATE);
 
         // Link contracts - This can only be done once per instance
         membershipNft.setVault(address(vault));
         vaultToken.setVaultAddress(address(vault));
-        vault.setRewardRate(REWARD_RATE);
 
-        priceFeed = new MockOracleFeed(2000 * 1e8, block.timestamp);
+        priceFeed = new MockOracleFeed(2000 * 1e8);
         stakingToken = new MockERC20();
 
         vault.addToken(address(stakingToken), address(priceFeed));
@@ -61,11 +61,11 @@ contract LockVaultTest is Test {
         vm.startPrank(owner);
         VaultToken freshToken = new VaultToken();
         address dummyVault = address(0x999);
-        freshToken.setVaultAddress(dummyVault); 
+        freshToken.setVaultAddress(dummyVault);
         vm.stopPrank();
 
         uint256 maxSupply = freshToken.MAX_SUPPLY();
-        
+
         vm.prank(dummyVault);
         freshToken.mint(user, maxSupply);
         assertEq(freshToken.totalSupply(), maxSupply);
@@ -86,7 +86,7 @@ contract LockVaultTest is Test {
     function test_MembershipNFT_Soulbound() public {
         vm.startPrank(owner);
         MembershipNFT freshNft = new MembershipNFT();
-        
+
         // Use a dummy address for the vault so we can bypass 'NotVault' during minting
         address dummyVault = address(0x999);
         freshNft.setVault(dummyVault);
@@ -95,7 +95,7 @@ contract LockVaultTest is Test {
         // Mint as the customized "vault"
         vm.prank(dummyVault);
         freshNft.mint(user, IMembershipNFT.Tier.Bronze);
-        
+
         assertEq(freshNft.balanceOf(user), 1);
 
         uint256 tokenId = 1;
@@ -124,7 +124,7 @@ contract LockVaultTest is Test {
     function test_MockPriceFeed_SettingAndRetrieval() public {
         int256 newPrice = 3000 * 1e8;
         vm.prank(owner);
-        priceFeed.setPrice(newPrice, block.timestamp);
+        priceFeed.setPrice(newPrice);
 
         (, int256 price,, uint256 updatedAt,) = priceFeed.latestRoundData();
         assertEq(price, newPrice);
@@ -174,28 +174,21 @@ contract LockVaultTest is Test {
 
     function test_MembershipBonusApplied() public {
         uint256 stakeAmount = 10_000 * 1e18;
-        
+
         vm.prank(user);
         vault.stake(address(stakingToken), stakeAmount, ILockVault.LockTier.ThirtyDays);
 
         assertEq(uint256(membershipNft.getTier(user)), uint256(IMembershipNFT.Tier.Gold));
 
         vm.warp(block.timestamp + 31 days);
-        
+
         vm.prank(user);
         vault.withdraw(0);
-        
+
         uint256 rewards = vaultToken.balanceOf(user);
         assertTrue(rewards > 0);
     }
 
-    // --- Access Control Tests ---
-
-    function test_AccessControl_Unauthorized() public {
-        vm.prank(user); // Should fail because not owner
-        vm.expectRevert(); 
-        vault.setRewardRate(2e9);
-    }
 
     // --- Whitelisting Tests ---
 
@@ -205,7 +198,7 @@ contract LockVaultTest is Test {
         assertFalse(vault.isWhitelisted(address(stakingToken)));
 
         vm.stopPrank();
-        
+
         vm.prank(user);
         vm.expectRevert(); // Reverts with NotWhitelisted
         vault.stake(address(stakingToken), 100, ILockVault.LockTier.ThirtyDays);
@@ -228,7 +221,7 @@ contract LockVaultTest is Test {
 
         // Crucial: get index BEFORE the prank or use startPrank
         uint256 lastIndex = vault.userStakeCount(user) - 1;
-        
+
         vm.prank(user);
         vault.withdraw(lastIndex);
 

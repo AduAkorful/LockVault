@@ -53,6 +53,8 @@ interface ILockVault {
     // Emitted when penalty tokens fail to mint to the treasury
     event PenaltyMintFailed(address indexed recipietn, uint256 indexed stakeIndex, uint256 amount);
 
+    // Emitted when membership tier is upgraded
+    event MembershipUpgraded(address indexed user, uint8 newTier);
     // Thrown when an amount provided is zero
     error ZeroAmount();
 
@@ -86,11 +88,8 @@ interface ILockVault {
     // Thrown when adding a token that has already been whitelisted
     error TokenAlreadyWhitelisted(address token);
 
-    // Thrown when a token does not satisfy the required 18 decimal checks
-    error InvalidDecimals();
-
-    // Thrown when attempting an emergency withdrawal on an already expired stake
-    error LockAlreadyExpired();
+    // Thrown when you don't meet the requirements to upgrade your tier
+    error UpgradeNotPossible();
 
     // Function to whitelist a token
     // Takes the token address and its respective price feed address
@@ -114,6 +113,9 @@ interface ILockVault {
 
     // Returns the pending rewards for a specific stake of a given user
     function getPendingRewards(address user, uint256 stakeIndex) external view returns (uint256);
+
+    //Called to upgrade user membership if they reach the required threshold
+    function upgradeMembershipTier(address user) external;
 
     // Returns the total USD value locked across the provided tokens using chainlink price feed
     function getTotalValueLocked(address[] calldata tokens) external view returns (uint256 totalUsd);
