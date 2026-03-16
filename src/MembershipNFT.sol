@@ -5,8 +5,10 @@ pragma solidity 0.8.33;
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IMembershipNFT} from "./interfaces/IMembershipNFT.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {IERC4906} from "@openzeppelin/contracts/interfaces/IERC4906.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
-contract MembershipNFT is ERC721, IMembershipNFT, Ownable2Step {
+contract MembershipNFT is ERC721, IERC4906, IMembershipNFT, Ownable2Step {
     // TokenId incremented before every mint
     uint256 private _nextTokenId;
 
@@ -16,13 +18,21 @@ contract MembershipNFT is ERC721, IMembershipNFT, Ownable2Step {
     // A mapping of members info to their addresses
     mapping(address => MemberInfo) private _memberInfo;
 
+    // Token metadata URI per membership tier.
+    mapping(Tier => string) private _tierTokenUri;
+
     // Constructor defining nft name and symbol
     // Also defines the owner role
     constructor() ERC721("LockVault Membership", "LVM") Ownable(msg.sender) {}
 
+    // Returns true if this contract implements the given interface (ERC721 or IERC4906)
+    // Both ERC721 and IERC165 declare supportsInterface, so both must be listed in override
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721, IERC165) returns (bool) {
+        return interfaceId == type(IERC4906).interfaceId || super.supportsInterface(interfaceId);
+    }
+
     // Sets the _vault address of the LockVault contract
     function setVault(address _vault) external onlyOwner {
-        if (vault != address(0)) revert VaultAlreadySet();
         if (_vault == address(0)) revert ZeroAddress();
         vault = _vault;
 
@@ -58,6 +68,34 @@ contract MembershipNFT is ERC721, IMembershipNFT, Ownable2Step {
         emit MembershipMinted(to, tokenId, tier);
     }
 
+    function setTierURI(Tier tier, string calldata uri) external onlyOwner {
+        _tierTokenUri[tier] = uri;
+        emit TierURIUpdated(tier, uri);
+    }
+
+    function setTierUrIs(string calldata bronzeUri, string calldata silverUri, string calldata goldUri)
+        external
+        onlyOwner
+    {
+        _tierTokenUri[Tier.Bronze] = bronzeUri;
+        _tierTokenUri[Tier.Silver] = silverUri;
+        _tierTokenUri[Tier.Gold] = goldUri;
+
+        emit TierURIUpdated(Tier.Bronze, bronzeUri);
+        emit TierURIUpdated(Tier.Silver, silverUri);
+        emit TierURIUpdated(Tier.Gold, goldUri);
+    }
+
+    function getTierURI(Tier tier) external view returns (string memory) {
+        return _tierTokenUri[tier];
+    }
+
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        address user = ownerOf(tokenId);
+        Tier tier = _memberInfo[user].tier;
+        return _tierTokenUri[tier];
+    }
+
     // Returns the membership tier of user
     function getTier(address user) external view returns (Tier) {
         if (_memberInfo[user].tokenId == 0) revert NoMembership();
@@ -78,6 +116,7 @@ contract MembershipNFT is ERC721, IMembershipNFT, Ownable2Step {
     }
 
     function upgradeTier(address user, Tier newTier) external {
+        if (msg.sender != vault) revert NotVault();
         if (user == address(0)) revert ZeroAddress();
         if (_memberInfo[user].tokenId == 0) revert NoMembership();
 

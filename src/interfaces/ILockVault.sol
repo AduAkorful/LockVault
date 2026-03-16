@@ -115,7 +115,7 @@ interface ILockVault {
     function getPendingRewards(address user, uint256 stakeIndex) external view returns (uint256);
 
     //Called to upgrade user membership if they reach the required threshold
-    function upgradeMembershipTier(address user) external;
+    function upgradeMembershipTier() external;
 
     // Returns the total USD value locked across the provided tokens using chainlink price feed
     function getTotalValueLocked(address[] calldata tokens) external view returns (uint256 totalUsd);

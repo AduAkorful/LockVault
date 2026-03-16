@@ -8,7 +8,7 @@ import {IVaultToken} from "./interfaces/IVaultToken.sol";
 
 contract VaultToken is ERC20, IVaultToken, Ownable2Step {
     // Set variable for maximum supply
-    uint256 public constant MAX_SUPPLY = 10_000_000 * 1e18;
+    uint256 public constant MAX_SUPPLY = 10_000_000e18;
 
     // Initialize vault address to restrict minting function
     address public vault;

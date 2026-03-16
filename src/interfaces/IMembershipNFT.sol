@@ -25,9 +25,6 @@ interface IMembershipNFT {
     // Thrown when mint is called by an unauthorized address.
     error NotVault();
 
-    // Thrown when set vault is called more than once.
-    error VaultAlreadySet();
-
     // Thrown when getTier is called for an address with no membership NFT
     error NoMembership();
 
@@ -42,8 +39,21 @@ interface IMembershipNFT {
 
     //Emitted when vault address is set
     event VaultSet(address vault);
+
+    // Emitted when a metadata URI is updated for a tier
+    event TierURIUpdated(Tier indexed tier, string uri);
+
     // Mints new membership nft to user based on their tier
     function mint(address to, Tier tier) external;
+
+    // Sets metadata URI for a single tier
+    function setTierURI(Tier tier, string calldata uri) external;
+
+    // Sets metadata URIs for all tiers
+    function setTierUrIs(string calldata bronzeUri, string calldata silverUri, string calldata goldUri) external;
+
+    // Returns metadata URI for a tier
+    function getTierURI(Tier tier) external view returns (string memory);
 
     // Returns the membership tier of user
     function getTier(address user) external view returns (Tier);

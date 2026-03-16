@@ -1,8 +1,19 @@
-#Foundry build artifacts
+# Foundry build artifacts
 /out/
 /cache/
 /broadcast/
+/metadata/
 
-# Optional
+# Environment files
 .env
 .env.local
+
+# Dependencies
+node_modules/
+
+# Frontend build output
+frontend/dist/
+
+# OS / editor
+.DS_Store
+*.log

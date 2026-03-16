@@ -189,7 +189,6 @@ contract LockVaultTest is Test {
         assertTrue(rewards > 0);
     }
 
-
     // --- Whitelisting Tests ---
 
     function test_WhitelistingAndDelisting() public {

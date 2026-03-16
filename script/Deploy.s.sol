@@ -34,6 +34,14 @@ contract Deploy is Script {
         membershipNft.setVault(address(lockVault));
         console.log("Linked MembershipNFT to LockVault");
 
+        // Set tier metadata URIs
+        membershipNft.setTierUrIs(
+            "ipfs://bafkreigoprtiwifyo4uw3fhhezaralnvjfrafyduahtswzgmzosnbsjn4a",
+            "ipfs://bafkreibmsughfi4hlxzhe45u2g5rzwjxlf7mmg5pca3rm64qulcf5a5lcy",
+            "ipfs://bafkreifmuh5afrq5ivyzjqrbljdy76tyx3flhgyzscbufp4ctvvseahyzi"
+        );
+        console.log("Set MembershipNFT tier URIs");
+
         vaultToken.setVaultAddress(address(lockVault));
         console.log("Linked VaultToken to LockVault");
 

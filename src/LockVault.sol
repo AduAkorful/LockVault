@@ -10,6 +10,7 @@ import {IVaultToken} from "./interfaces/IVaultToken.sol";
 import {IMembershipNFT} from "./interfaces/IMembershipNFT.sol";
 import {IMockOracleFeed} from "./interfaces/IMockOracleFeed.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract LockVault is ILockVault, Ownable2Step {
     using SafeERC20 for IERC20;
@@ -81,8 +82,11 @@ contract LockVault is ILockVault, Ownable2Step {
     // Number of active unclamed stakes per user.
     mapping(address => uint256) public activeStakeCount;
 
-    // Total lifetime staking volume per user.
-    mapping(address => uint256) public userTotalVolume;
+    // Total lifetime staked amount per user.
+    mapping(address => uint256) public userTotalStake;
+
+    // Total lifetime staked amount per user normalized to 18 decimals.
+    mapping(address => uint256) public userTotalNormalizedStake;
 
     // Whether a token is currently whitelisted for new stakes.
     mapping(address => bool) public isWhitelisted;
@@ -95,9 +99,6 @@ contract LockVault is ILockVault, Ownable2Step {
 
     // Total amount of each token normalized to 18 decimals
     mapping(address => uint256) public totalNormalizedStakePerToken;
-
-    // Ordered list of currently whitelisted token addresses.
-    address[] public whitelistedTokens;
 
     // Sets address of membership nft token, vault token and treasury to send forfeited tokens
     constructor(address _membershipNft, address _vaultToken, address _treasury, uint256 _rewardRate)
@@ -145,6 +146,7 @@ contract LockVault is ILockVault, Ownable2Step {
 
     // Allows users to stake available whitelisted tokens based on specified amount and lock tier
     function stake(address token, uint256 amount, LockTier tier) external {
+        if (token == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
         if (!isWhitelisted[token]) revert NotWhitelisted(token);
         if (activeStakeCount[msg.sender] >= MAX_ACTIVE_STAKES) revert MaxStakesReached();
@@ -164,7 +166,8 @@ contract LockVault is ILockVault, Ownable2Step {
         totalStakedPerToken[token] += amount;
         totalNormalizedStakePerToken[token] += normalizedAmount;
 
-        userTotalVolume[msg.sender] += amount;
+        userTotalStake[msg.sender] += amount;
+        userTotalNormalizedStake[msg.sender] += normalizedAmount;
         _checkAndMintMembership(msg.sender);
 
         emit Staked(msg.sender, token, amount, tier, stakeIndex);
@@ -186,7 +189,6 @@ contract LockVault is ILockVault, Ownable2Step {
         totalStakedPerToken[token] -= principal;
 
         emit Withdrawn(msg.sender, stakeIndex, principal, rewards);
-        emit RewardsClaimed(msg.sender, stakeIndex, rewards);
 
         IERC20(token).safeTransfer(msg.sender, principal);
 
@@ -243,20 +245,19 @@ contract LockVault is ILockVault, Ownable2Step {
 
     // Returns the pending rewards for a specific stake of a given user
     function getPendingRewards(address user, uint256 stakeIndex) external view returns (uint256) {
-        if (stakeIndex > userStakeCount[user]) {
+        if (stakeIndex >= userStakeCount[user]) {
             revert InvalidStakeIndex(stakeIndex, userStakeCount[user]);
         }
 
-        Stake storage s = _userStakes[user][stakeIndex];
+        Stake memory s = _userStakes[user][stakeIndex];
         if (s.claimed) return 0;
         return _calculateRewards(s, user);
     }
 
     //Called to upgrade user membership if they reach the required threshold
-    function upgradeMembershipTier(address user) external {
-        if (user == address(0)) revert ZeroAddress();
-        uint256 userVolume = userTotalVolume[user];
-        uint8 currentTier = uint8(MEMBERSHIP_NFT.getTier(user));
+    function upgradeMembershipTier() external {
+        uint256 userVolume = userTotalNormalizedStake[msg.sender];
+        uint8 currentTier = uint8(MEMBERSHIP_NFT.getTier(msg.sender));
         uint8 newTier;
 
         if (currentTier == MEMBERSHIP_NFT.getBronzeTier() && userVolume >= SILVER_THRESHOLD) {
@@ -267,14 +268,15 @@ contract LockVault is ILockVault, Ownable2Step {
             revert UpgradeNotPossible();
         }
 
-        MEMBERSHIP_NFT.upgradeTier(user, IMembershipNFT.Tier(newTier));
+        MEMBERSHIP_NFT.upgradeTier(msg.sender, IMembershipNFT.Tier(newTier));
 
-        emit MembershipUpgraded(user, newTier);
+        emit MembershipUpgraded(msg.sender, newTier);
     }
 
     // Returns the total USD value locked across the provided tokens using chainlink price feed
     function getTotalValueLocked(address[] calldata tokens) external view returns (uint256 totalUsd) {
-        for (uint256 i = 0; i < tokens.length; i++) {
+        uint256 tokenCount = tokens.length;
+        for (uint256 i = 0; i < tokenCount; i++) {
             address token = tokens[i];
 
             if (!isWhitelisted[token]) revert NotWhitelisted(token);
@@ -291,7 +293,7 @@ contract LockVault is ILockVault, Ownable2Step {
             // result is in 8 decimals (standard USD feed precision)
             // casting to 'uint256' is safe because we revert above if price <= 0
             // forge-lint: disable-next-line(unsafe-typecast)
-            totalUsd += (staked * uint256(price)) / 1e18;
+            totalUsd += Math.mulDiv(staked, uint256(price), 1e18);
         }
     }
 
@@ -325,28 +327,26 @@ contract LockVault is ILockVault, Ownable2Step {
         }
     }
 
-    function _calculateRewards(Stake storage s, address user) private view returns (uint256) {
-        uint256 elapsed;
-        if (block.timestamp > s.startTime) {
-            elapsed = block.timestamp - s.startTime;
-        } else {
-            elapsed = 0;
-        }
+    function _calculateRewards(Stake memory s, address user) private view returns (uint256) {
         uint256 duration = _lockDuration(s.lockTier);
-        if (elapsed > duration) elapsed = duration;
+        uint256 elapsed = 0;
+        if (block.timestamp > s.startTime) {
+            elapsed = Math.min(block.timestamp - s.startTime, duration);
+        }
 
-        uint256 baseReward = (s.amount * REWARD_RATE * elapsed) / PRECISION;
-        uint256 tieredReward = (baseReward * _tierMultiplier(s.lockTier)) / 100;
+        uint256 amountRate = Math.mulDiv(s.amount, REWARD_RATE, PRECISION);
+        uint256 baseReward = Math.mulDiv(amountRate, elapsed, 1);
+        uint256 tieredReward = Math.mulDiv(baseReward, _tierMultiplier(s.lockTier), 100);
         uint256 bonusPct = _membershipBonus(user);
-        return baseReward + ((tieredReward * (100 + bonusPct)) / 100);
+        return baseReward + Math.mulDiv(tieredReward, 100 + bonusPct, 100);
     }
 
     function _checkAndMintMembership(address user) internal {
         if (MEMBERSHIP_NFT.getMemberInfo(user).tokenId != 0) return;
 
-        uint256 volume = userTotalVolume[user];
+        uint256 volume = userTotalNormalizedStake[user];
         IMembershipNFT.Tier targetTier;
-        bool eligible = false;
+        bool eligible;
 
         if (volume >= GOLD_THRESHOLD) {
             targetTier = IMembershipNFT.Tier.Gold;
@@ -360,7 +360,7 @@ contract LockVault is ILockVault, Ownable2Step {
         }
 
         if (eligible) {
-            try MEMBERSHIP_NFT.mint(user, targetTier) {} catch {}
+            MEMBERSHIP_NFT.mint(user, targetTier);
         }
     }
 }
