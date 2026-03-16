@@ -32,7 +32,7 @@ contract MembershipNFT is ERC721, IERC4906, IMembershipNFT, Ownable2Step {
     }
 
     // Sets the _vault address of the LockVault contract
-    function setVault(address _vault) external onlyOwner {
+    function setVaultAddress(address _vault) external onlyOwner {
         if (_vault == address(0)) revert ZeroAddress();
         vault = _vault;
 
@@ -55,7 +55,7 @@ contract MembershipNFT is ERC721, IERC4906, IMembershipNFT, Ownable2Step {
     }
 
     // Mints new membership nft to user based on their tier
-    // Function is restricted to only the owner and it emits the MembershipMinted event
+    // Function is restricted to only the vault and it emits the MembershipMinted event
     function mint(address to, Tier tier) external {
         if (msg.sender != vault) revert NotVault();
         if (_memberInfo[to].tokenId != 0) revert AlreadyHasMembership();

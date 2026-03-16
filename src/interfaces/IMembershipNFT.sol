@@ -62,7 +62,7 @@ interface IMembershipNFT {
     function getMemberInfo(address user) external view returns (MemberInfo memory info);
 
     // Called to set LockVault address
-    function setVault(address _vault) external;
+    function setVaultAddress(address _vault) external;
 
     // getter function for the bronze tier
     function getBronzeTier() external view returns (uint8);

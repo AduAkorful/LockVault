@@ -12,9 +12,6 @@ interface IVaultToken {
     //Thrown when mint function is called by an address other than the vault
     error NotVault();
 
-    // Thrown when when set vault is called after it has already been set
-    error VaultAlreadySet();
-
     // Thrown when a mint would push the total supply past the max supply
     error CapExceeded();
 

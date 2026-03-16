@@ -18,14 +18,13 @@ contract VaultToken is ERC20, IVaultToken, Ownable2Step {
 
     // Function to set vault address which can be done only by the deployer
     function setVaultAddress(address _vault) external onlyOwner {
-        if (vault != address(0)) revert VaultAlreadySet();
         if (_vault == address(0)) revert ZeroAddress();
         vault = _vault;
         emit VaultSet(_vault);
     }
 
     // Function to mint tokens which verifies the max supply won't be exceeded
-    // Can only be called by the vault contract since onlyVault modifier is applied
+    // Can only be called by the vault contract
     function mint(address _to, uint256 _amount) external {
         if (msg.sender != vault) revert NotVault();
         if (totalSupply() + _amount > MAX_SUPPLY) revert CapExceeded();

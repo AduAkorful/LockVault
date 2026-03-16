@@ -31,7 +31,7 @@ contract Deploy is Script {
         console.log("LockVault deployed at:", address(lockVault));
 
         // 4. Link MembershipNFT and VaultToken to LockVault
-        membershipNft.setVault(address(lockVault));
+        membershipNft.setVaultAddress(address(lockVault));
         console.log("Linked MembershipNFT to LockVault");
 
         // Set tier metadata URIs

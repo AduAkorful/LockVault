@@ -1,7 +1,7 @@
 # LockVault
 
 ## Project Overview
-LockVault is a comprehensive decentralized staking protocol that enables users to deposit whitelisted ERC20 tokens into time-locked tiers (30, 90, or 180 days). In return for securing liquidity, users earn `VaultToken` (VTK) rewards dynamically calculated based on their lock duration and staking volume. The protocol features an integrated `MembershipNFT` system that automatically mints "soulbound" tier-based NFTs (Bronze, Silver, Gold) to high-volume stakers, granting them permanent reward multipliers. The protocol also includes an emergency withdrawal function that penalizes early unstaking by forfeiting 50% of accrued rewards to the protocol treasury while returning the initial principal.
+LockVault is a comprehensive decentralized staking protocol that enables users to deposit whitelisted ERC20 tokens into time-locked tiers (30, 90, or 180 days). In return for securing liquidity, users earn `VaultToken` (VTK) rewards dynamically calculated based on their lock duration and staking volume. The protocol features an integrated `MembershipNFT` system that automatically mints "soulbound" tier-based NFTs (Bronze, Silver, Gold) to high-volume stakers, granting them permanent reward multipliers. Membership metadata is managed per tier and exposed through standard ERC721 metadata (`tokenURI`) with IERC4906-compatible interface support for metadata updates. The protocol also includes an emergency withdrawal function that penalizes early unstaking by forfeiting 50% of accrued rewards to the protocol treasury while returning the initial principal.
 
 ## Design Decisions
 
@@ -10,11 +10,11 @@ I utilized OpenZeppelin's `Ownable2Step` for the primary administrative access c
 * **Why:** Unlike standard `Ownable`, which transfers ownership in a single transaction, `Ownable2Step` mitigates the catastrophic risk of accidentally transferring ownership to an incorrect or dead address. The new owner must actively `acceptOwnership()`, creating a safe fail-safe mechanism for admin roles (like setting reward rates or whitelisting tokens).
 
 ### NFT Minting Authorization Mechanism
-The `MembershipNFT` and `VaultToken` contracts employ a strict modifier (`onlyVault`) that restricts their `mint()` functions so they can *only* be called by the `LockVault` contract address. 
+The `MembershipNFT` and `VaultToken` contracts enforce vault-only access on their `mint()` functions via an inline `if (msg.sender != vault) revert NotVault()` check, so they can *only* be called by the `LockVault` contract address. 
 * **Trust Model:** This assumes a "Hub and Spoke" trust model where the `LockVault` is the absolute source of truth for all state changes, calculations, and qualifications. The NFT and Token contracts are "dumb" ledgers that fully trust the Vault's math.
 * **Trade-offs:** 
   * *Pros:* Keeps the NFT and Token contracts extremely simple, cheap to deploy, and isolates complex logic into one place. 
-  * *Cons:* If the `LockVault` contract is ever compromised or needs to be upgraded, the deployer will need to call `setVault()` on the Token and NFT contracts to point them to the new V2 vault address. During that transition, trust is temporarily placed in the deployer wallet holding the `Ownable` rights to execute that switch.
+  * *Cons:* If the `LockVault` contract is ever compromised or needs to be upgraded, the deployer can call `setVaultAddress()` on both `MembershipNFT` and `VaultToken` to re-point both to the new vault address. During that transition, trust is temporarily placed in the deployer wallet holding the `Ownable` rights to execute those switches.
 
 ### Data Structure Strategy for Stakes
 `LockVault` handles user deposits using a custom `Stake` struct, which is tracked via a double mapping: `mapping(address => mapping(uint256 => Stake)) private _userStakes;`.
@@ -23,7 +23,7 @@ The `MembershipNFT` and `VaultToken` contracts employ a strict modifier (`onlyVa
 
 ### Reward Engine and Math Precision
 Rewards are calculated per second based on the principal amount, time elapsed, and two distinct multipliers (Tier Lock + Membership NFT).
-* **Preserving Precision:** To handle token fractions without floating-point math issues, the `rewardRate` is scaled up by a `PRECISION` constant (`1e18`). During calculation `(_calculateRewards)`, the base reward is calculated by multiplying `amount * rate * time` first, and then dividing by `PRECISION` at the very end to prevent rounding down to zero prematurely.
+* **Preserving Precision:** To handle token fractions without floating-point math issues, the `rewardRate` is scaled up by a `PRECISION` constant (`1e18`). During calculation `(_calculateRewards)`, the implementation uses staged `Math.mulDiv` operations (amount-rate, elapsed time, tier multiplier, and membership bonus) to keep arithmetic precise and overflow-safe.
 * **Modular Math:** Multipliers are applied sequentially. First, the time lock tier multiplier (e.g., `250%` for 90 days), and finally the NFT bonus percentage (e.g., `+50%` for Gold).
 
 ### Edge Case Handling
@@ -48,7 +48,7 @@ Throughout the development of `LockVault`, several critical attack vectors were 
 
 4. **Malicious Token Integration:**
    * *Vector:* Exotic tokens (e.g., fee-on-transfer tokens) or malicious tokens without proper `approve`/`transferFrom` returns could break the vault accounting.
-   * *Mitigation:* The contract utilizes OpenZeppelin's `SafeERC20` wrapper for all token interactions. The admin must explicitly whitelist tokens via `addToken()`, establishing a trusted perimeter, and verifying that the token strictly uses 18 decimals before interacting.
+   * *Mitigation:* The contract utilizes OpenZeppelin's `SafeERC20` wrapper for all token interactions. The admin must explicitly whitelist tokens via `addToken()`, establishing a trusted perimeter. Token amounts are normalized to 18-decimal precision internally, so different ERC20 decimal formats are supported in accounting and reward-threshold tracking.
 
 ## Setup & Run Instructions
 
@@ -80,7 +80,7 @@ cast wallet import mywallet --interactive
 ```
 
 **4. Deploying**
-A deployment script (`Deploy.s.sol`) is included to instantiate the LockVault, VaultToken, MembershipNFT, and a Mock Oracle Feed on your chosen network.
+A deployment script (`Deploy.s.sol`) is included to instantiate the LockVault, VaultToken, MembershipNFT, MockEthToken, and a Mock Oracle Feed on your chosen network. The script also links vault permissions and sets tier metadata URIs.
 
 Source your environment variables:
 ```bash
@@ -92,6 +92,18 @@ Execute the deployment script (make sure you use the wallet name you configured 
 ```bash
 forge script script/Deploy.s.sol:Deploy --rpc-url $RPC_URL --account mywallet --broadcast --verify --etherscan-api-key $ETHERSCAN_API_KEY -vvvv
 ```
+
+**5. Frontend Integration Environment Setup**
+The frontend integration reads runtime values from `import.meta.env` (`VITE_*` keys). Copy the frontend template and set your values:
+
+```bash
+cp frontend/.env.example frontend/.env
+```
+
+Required frontend variables:
+- `VITE_SEPOLIA_RPC_URL`
+- `VITE_WALLETCONNECT_PROJECT_ID`
+- `VITE_LOCKVAULT_ADDRESS`
 
 ---
 

@@ -39,7 +39,7 @@ contract LockVaultTest is Test {
         vault = new LockVault(address(membershipNft), address(vaultToken), treasury, REWARD_RATE);
 
         // Link contracts - This can only be done once per instance
-        membershipNft.setVault(address(vault));
+        membershipNft.setVaultAddress(address(vault));
         vaultToken.setVaultAddress(address(vault));
 
         priceFeed = new MockOracleFeed(2000 * 1e8);
@@ -89,7 +89,7 @@ contract LockVaultTest is Test {
 
         // Use a dummy address for the vault so we can bypass 'NotVault' during minting
         address dummyVault = address(0x999);
-        freshNft.setVault(dummyVault);
+        freshNft.setVaultAddress(dummyVault);
         vm.stopPrank();
 
         // Mint as the customized "vault"
@@ -109,7 +109,7 @@ contract LockVaultTest is Test {
         vm.startPrank(owner);
         MembershipNFT freshNft = new MembershipNFT();
         address dummyVault = address(0x999);
-        freshNft.setVault(dummyVault);
+        freshNft.setVaultAddress(dummyVault);
         vm.stopPrank();
 
         // Mint as the vault
