@@ -9,7 +9,7 @@ import {VaultToken} from "../src/VaultToken.sol";
 import {ILockVault} from "../src/interfaces/ILockVault.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract FuzzMockERC20Decimals is ERC20 {
+contract MockERC20WithDecimals is ERC20 {
     uint8 private immutable _customDecimals;
 
     constructor(string memory name_, string memory symbol_, uint8 customDecimals_) ERC20(name_, symbol_) {
@@ -29,7 +29,7 @@ contract LockVaultFuzzTest is Test {
     LockVault internal vault;
     MembershipNFT internal membershipNft;
     VaultToken internal vaultToken;
-    FuzzMockERC20Decimals internal stakingToken;
+    MockERC20WithDecimals internal stakingToken;
     MockOracleFeed internal feed;
 
     address internal user = address(0xFEED);
@@ -45,7 +45,7 @@ contract LockVaultFuzzTest is Test {
         membershipNft.setVaultAddress(address(vault));
         vaultToken.setVaultAddress(address(vault));
 
-        stakingToken = new FuzzMockERC20Decimals("Stake", "STK", 18);
+        stakingToken = new MockERC20WithDecimals("Stake", "STK", 18);
         feed = new MockOracleFeed(2_000e8);
         vault.addToken(address(stakingToken), address(feed));
 
@@ -108,8 +108,9 @@ contract LockVaultFuzzTest is Test {
     }
 
     function testFuzz_GetTotalValueLocked_UsesNormalizedStake(uint256 amount6Decimals) public {
-        FuzzMockERC20Decimals token6 = new FuzzMockERC20Decimals("Token6", "TK6", 6);
-        MockOracleFeed token6Feed = new MockOracleFeed(1_234e8);
+        int256 token6Price = 1_234e8; // 123.4 USD with 8 decimals, for clarity
+        MockERC20WithDecimals token6 = new MockERC20WithDecimals("Token6", "TK6", 6);
+        MockOracleFeed token6Feed = new MockOracleFeed(token6Price);
         vault.addToken(address(token6), address(token6Feed));
 
         amount6Decimals = bound(amount6Decimals, 1e6, 10_000_000e6);
@@ -123,7 +124,7 @@ contract LockVaultFuzzTest is Test {
         address[] memory tokens = new address[](1);
         tokens[0] = address(token6);
 
-        uint256 expected = ((amount6Decimals * 1e12) * 1_234e8) / 1e18;
+        uint256 expected = ((amount6Decimals * 1e12) * uint256(token6Price)) / 1e18;
         uint256 tvl = vault.getTotalValueLocked(tokens);
 
         assertEq(tvl, expected);

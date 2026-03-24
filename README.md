@@ -111,7 +111,11 @@ Required frontend variables:
 
 If you would rather interact with the deployed protocol directly without cloning the repository, you can access the verified contracts on the Sepolia testnet using the links below:
 
-// To be updated after some updates.
+- [LockVault](https://sepolia.etherscan.io/address/0x046b26e18acfdc6d438ccc645769829a58d47921)
+- [MembershipNFT](https://sepolia.etherscan.io/address/0x0d9fb8979a9ba9bb49dc5a0228c87667996e4f01)
+- [VaultToken](https://sepolia.etherscan.io/address/0xf969cb28ade6da6953b82b2bb7034a69c7e2f608)
+- [MockEthToken](https://sepolia.etherscan.io/address/0x7f4b99dfd1b9056f4789fe09e6e058fa85919468)
+- [MockOracleFeed](https://sepolia.etherscan.io/address/0xa1c0329bad86d932383c73c59c5df551dbbf3884)
 
 ### How to Interact via Etherscan
 

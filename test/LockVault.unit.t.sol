@@ -88,7 +88,10 @@ contract LockVaultUnitTest is Test {
         vm.stopPrank();
     }
 
-    function _deployVaultWithUnlinkedMintToken() internal returns (LockVault failingVault, LocalMockERC20Decimals failingToken) {
+    function _deployVaultWithUnlinkedMintToken()
+        internal
+        returns (LockVault failingVault, LocalMockERC20Decimals failingToken)
+    {
         MembershipNFT localNft = new MembershipNFT();
         VaultToken localVaultToken = new VaultToken();
 

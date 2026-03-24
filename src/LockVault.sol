@@ -25,13 +25,13 @@ contract LockVault is ILockVault, Ownable2Step {
     uint256 public constant STALENESS_THRESHOLD = 1 hours;
 
     // Volume required for Bronze tier (1,000 tokens).
-    uint256 public constant BRONZE_THRESHOLD = 1_000 * 1e18;
+    uint256 public constant BRONZE_THRESHOLD = 1_000e18;
 
     // Volume required for Silver tier (5,000 tokens).
-    uint256 public constant SILVER_THRESHOLD = 5_000 * 1e18;
+    uint256 public constant SILVER_THRESHOLD = 5_000e18;
 
     // Volume required for Gold tier (10,000 tokens).
-    uint256 public constant GOLD_THRESHOLD = 10_000 * 1e18;
+    uint256 public constant GOLD_THRESHOLD = 10_000e18;
 
     // The VaultToken contract that this vault is authorized to mint
     IVaultToken public immutable VAULT_TOKEN;
