@@ -168,6 +168,7 @@ contract LockVault is ILockVault, Ownable2Step {
 
         userTotalStake[msg.sender] += amount;
         userTotalNormalizedStake[msg.sender] += normalizedAmount;
+
         _checkAndMintMembership(msg.sender);
 
         emit Staked(msg.sender, token, amount, tier, stakeIndex);
@@ -237,10 +238,9 @@ contract LockVault is ILockVault, Ownable2Step {
     }
 
     function _normalize(uint256 amount, uint8 decimals) internal pure returns (uint256) {
-        uint256 normalizedAmount;
-        if (decimals < 18) return normalizedAmount = amount * 10 ** (18 - decimals);
-        else if (decimals > 18) return normalizedAmount = amount / 10 ** (decimals - 18);
-        else return amount;
+        if (decimals < 18) return amount * 10 ** (18 - decimals);
+        if (decimals > 18) return amount / 10 ** (decimals - 18);
+        return amount;
     }
 
     // Returns the pending rewards for a specific stake of a given user
@@ -258,7 +258,7 @@ contract LockVault is ILockVault, Ownable2Step {
     function upgradeMembershipTier() external {
         uint256 userVolume = userTotalNormalizedStake[msg.sender];
         uint8 currentTier = uint8(MEMBERSHIP_NFT.getTier(msg.sender));
-        uint8 newTier;
+        uint8 newTier = currentTier;
 
         if (currentTier == MEMBERSHIP_NFT.getBronzeTier() && userVolume >= SILVER_THRESHOLD) {
             newTier = MEMBERSHIP_NFT.getSilverTier();
@@ -345,22 +345,13 @@ contract LockVault is ILockVault, Ownable2Step {
         if (MEMBERSHIP_NFT.getMemberInfo(user).tokenId != 0) return;
 
         uint256 volume = userTotalNormalizedStake[user];
-        IMembershipNFT.Tier targetTier;
-        bool eligible;
 
         if (volume >= GOLD_THRESHOLD) {
-            targetTier = IMembershipNFT.Tier.Gold;
-            eligible = true;
+            MEMBERSHIP_NFT.mint(user, IMembershipNFT.Tier.Gold);
         } else if (volume >= SILVER_THRESHOLD) {
-            targetTier = IMembershipNFT.Tier.Silver;
-            eligible = true;
+            MEMBERSHIP_NFT.mint(user, IMembershipNFT.Tier.Silver);
         } else if (volume >= BRONZE_THRESHOLD) {
-            targetTier = IMembershipNFT.Tier.Bronze;
-            eligible = true;
-        }
-
-        if (eligible) {
-            MEMBERSHIP_NFT.mint(user, targetTier);
+            MEMBERSHIP_NFT.mint(user, IMembershipNFT.Tier.Bronze);
         }
     }
 }

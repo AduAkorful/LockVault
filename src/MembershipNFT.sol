@@ -32,11 +32,11 @@ contract MembershipNFT is ERC721, IERC4906, IMembershipNFT, Ownable2Step {
     }
 
     // Sets the _vault address of the LockVault contract
-    function setVaultAddress(address _vault) external onlyOwner {
-        if (_vault == address(0)) revert ZeroAddress();
-        vault = _vault;
+    function setVaultAddress(address newVault) external onlyOwner {
+        if (newVault == address(0)) revert ZeroAddress();
+        vault = newVault;
 
-        emit VaultSet(_vault);
+        emit VaultSet(newVault);
     }
 
     // getter function for the bronze tier

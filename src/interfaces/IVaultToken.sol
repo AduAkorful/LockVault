@@ -16,8 +16,8 @@ interface IVaultToken {
     error CapExceeded();
 
     // Called to set the address of the vault for minting
-    function setVaultAddress(address _vault) external;
+    function setVaultAddress(address newVault) external;
 
     // Mints tokens to an address
-    function mint(address _to, uint256 _amount) external;
+    function mint(address to, uint256 amount) external;
 }

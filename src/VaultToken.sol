@@ -17,17 +17,17 @@ contract VaultToken is ERC20, IVaultToken, Ownable2Step {
     constructor() ERC20("VaultToken", "VTK") Ownable(msg.sender) {}
 
     // Function to set vault address which can be done only by the deployer
-    function setVaultAddress(address _vault) external onlyOwner {
-        if (_vault == address(0)) revert ZeroAddress();
-        vault = _vault;
-        emit VaultSet(_vault);
+    function setVaultAddress(address newVault) external onlyOwner {
+        if (newVault == address(0)) revert ZeroAddress();
+        vault = newVault;
+        emit VaultSet(newVault);
     }
 
     // Function to mint tokens which verifies the max supply won't be exceeded
     // Can only be called by the vault contract
-    function mint(address _to, uint256 _amount) external {
+    function mint(address to, uint256 amount) external {
         if (msg.sender != vault) revert NotVault();
-        if (totalSupply() + _amount > MAX_SUPPLY) revert CapExceeded();
-        _mint(_to, _amount);
+        if (totalSupply() + amount > MAX_SUPPLY) revert CapExceeded();
+        _mint(to, amount);
     }
 }

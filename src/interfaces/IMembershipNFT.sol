@@ -38,7 +38,7 @@ interface IMembershipNFT {
     event MembershipUpgraded(address indexed user, Tier indexed newTier);
 
     //Emitted when vault address is set
-    event VaultSet(address vault);
+    event VaultSet(address indexed vault);
 
     // Emitted when a metadata URI is updated for a tier
     event TierURIUpdated(Tier indexed tier, string uri);
@@ -62,7 +62,7 @@ interface IMembershipNFT {
     function getMemberInfo(address user) external view returns (MemberInfo memory info);
 
     // Called to set LockVault address
-    function setVaultAddress(address _vault) external;
+    function setVaultAddress(address newVault) external;
 
     // getter function for the bronze tier
     function getBronzeTier() external view returns (uint8);
